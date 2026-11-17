@@ -46,7 +46,8 @@ def analyze_sql_patterns(text):
     """Educational pattern checks only. Never executes submitted SQL."""
     patterns = [
         (r"\bUNION\s+SELECT\b", "UNION-based SQL pattern"),
-        (r"\bOR\s+['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?", "Suspicious OR condition"),
+        (r"\bOR\s+['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?",
+         "Suspicious OR condition"),
         (r"(--|/\*|\*/|;--)", "SQL comment or statement separator"),
         (r"\b(DROP|DELETE|ALTER|TRUNCATE)\s+(TABLE|DATABASE)\b",
          "Destructive SQL keyword combination"),
@@ -88,7 +89,6 @@ def save_event(scan_type, risk_level, finding):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     with get_db() as db:
-        # Parameterized SQL prevents user input from becoming SQL code.
         db.execute(
             """
             INSERT INTO scan_events (scan_type, risk_level, finding, scanned_at)
@@ -106,11 +106,26 @@ def get_dashboard_data():
         ).fetchone()[0]
 
         threats = db.execute(
-            "SELECT COUNT(*) FROM scan_events WHERE risk_level IN ('High', 'Medium')"
+            """
+            SELECT COUNT(*) FROM scan_events
+            WHERE risk_level IN ('High', 'Medium')
+            """
         ).fetchone()[0]
 
         safe_scans = db.execute(
             "SELECT COUNT(*) FROM scan_events WHERE risk_level = 'Low'"
+        ).fetchone()[0]
+
+        low_risk = db.execute(
+            "SELECT COUNT(*) FROM scan_events WHERE risk_level = 'Low'"
+        ).fetchone()[0]
+
+        medium_risk = db.execute(
+            "SELECT COUNT(*) FROM scan_events WHERE risk_level = 'Medium'"
+        ).fetchone()[0]
+
+        high_risk = db.execute(
+            "SELECT COUNT(*) FROM scan_events WHERE risk_level = 'High'"
         ).fetchone()[0]
 
         events = db.execute(
@@ -122,10 +137,23 @@ def get_dashboard_data():
             """
         ).fetchall()
 
+    risk_counts = {
+        "low": low_risk,
+        "medium": medium_risk,
+        "high": high_risk
+    }
+
+    risk_percentages = {
+        level: round((count / total_scans) * 100, 1) if total_scans else 0
+        for level, count in risk_counts.items()
+    }
+
     return {
         "total_scans": total_scans,
         "threats": threats,
         "safe_scans": safe_scans,
+        "risk_counts": risk_counts,
+        "risk_percentages": risk_percentages,
         "events": events
     }
 

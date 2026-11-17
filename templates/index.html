@@ -23,6 +23,7 @@
 
         <div class="side-label">WORKSPACE</div>
         <a href="#overview" class="nav-item active">◈ <span>Overview</span></a>
+        <a href="#analytics" class="nav-item">▥ <span>Security Analytics</span></a>
         <a href="#scanner" class="nav-item">⌕ <span>Threat Scanner</span></a>
         <a href="#events" class="nav-item">▤ <span>Security Logs</span></a>
         <a href="#assessment" class="nav-item">◉ <span>Risk Assessment</span></a>
@@ -37,6 +38,7 @@
     </aside>
 
     <main class="main-content">
+
         <header class="topbar">
             <div>
                 <div class="eyebrow">SECURITY OPERATIONS / DASHBOARD</div>
@@ -49,6 +51,7 @@
             </div>
         </header>
 
+        <!-- OVERVIEW -->
         <section id="overview">
             <div class="section-heading">
                 <div>
@@ -79,13 +82,116 @@
             </div>
         </section>
 
+        <!-- SECURITY ANALYTICS -->
+        <section id="analytics" class="content-section">
+            <div class="section-heading">
+                <div>
+                    <h2>Security Analytics</h2>
+                    <p>Risk distribution based on recorded scan results</p>
+                </div>
+                <span class="date-chip">LIVE DATABASE SUMMARY</span>
+            </div>
+
+            <div class="analytics-grid">
+
+                <div class="analytics-card">
+                    <div class="analytics-card-heading">
+                        <div>
+                            <h3>Risk Distribution</h3>
+                            <p>Breakdown of all recorded scans</p>
+                        </div>
+                        <span class="analytics-icon">▥</span>
+                    </div>
+
+                    <div class="risk-chart">
+
+                        <div class="chart-item">
+                            <div class="chart-label">
+                                <span class="chart-dot low-dot"></span>
+                                <strong>Low Risk</strong>
+                                <span class="chart-value">{{ stats.risk_counts.low }}</span>
+                            </div>
+                            <div class="chart-track">
+                                <div class="chart-fill low-fill"
+                                     style="width: {{ stats.risk_percentages.low }}%"></div>
+                            </div>
+                            <small>{{ stats.risk_percentages.low }}% of total scans</small>
+                        </div>
+
+                        <div class="chart-item">
+                            <div class="chart-label">
+                                <span class="chart-dot medium-dot"></span>
+                                <strong>Medium Risk</strong>
+                                <span class="chart-value">{{ stats.risk_counts.medium }}</span>
+                            </div>
+                            <div class="chart-track">
+                                <div class="chart-fill medium-fill"
+                                     style="width: {{ stats.risk_percentages.medium }}%"></div>
+                            </div>
+                            <small>{{ stats.risk_percentages.medium }}% of total scans</small>
+                        </div>
+
+                        <div class="chart-item">
+                            <div class="chart-label">
+                                <span class="chart-dot high-dot"></span>
+                                <strong>High Risk</strong>
+                                <span class="chart-value">{{ stats.risk_counts.high }}</span>
+                            </div>
+                            <div class="chart-track">
+                                <div class="chart-fill high-fill"
+                                     style="width: {{ stats.risk_percentages.high }}%"></div>
+                            </div>
+                            <small>{{ stats.risk_percentages.high }}% of total scans</small>
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="analytics-card analytics-summary">
+                    <div class="analytics-card-heading">
+                        <div>
+                            <h3>Analytics Summary</h3>
+                            <p>Current scan statistics</p>
+                        </div>
+                        <span class="analytics-icon">◉</span>
+                    </div>
+
+                    <div class="summary-stat">
+                        <span>Total Recorded Scans</span>
+                        <strong>{{ stats.total_scans }}</strong>
+                    </div>
+
+                    <div class="summary-stat">
+                        <span>Low Risk</span>
+                        <strong class="summary-low">{{ stats.risk_counts.low }}</strong>
+                    </div>
+
+                    <div class="summary-stat">
+                        <span>Medium Risk</span>
+                        <strong class="summary-medium">{{ stats.risk_counts.medium }}</strong>
+                    </div>
+
+                    <div class="summary-stat">
+                        <span>High Risk</span>
+                        <strong class="summary-high">{{ stats.risk_counts.high }}</strong>
+                    </div>
+
+                    <div class="analytics-note">
+                        Analytics are calculated from locally stored scan records.
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- THREAT SCANNER -->
         <section id="scanner" class="content-section">
             <div class="section-heading">
                 <div>
                     <h2>Threat Scanner</h2>
                     <p>Analyze sample text in this local educational environment</p>
                 </div>
-                <span class="secure-chip">● SCANNER READY</span>
+                <span class="secure-chip">◉ SCANNER READY</span>
             </div>
 
             <div class="scanner-card">
@@ -133,6 +239,7 @@
             </div>
         </section>
 
+        <!-- SECURITY LOGS -->
         <section id="events" class="content-section">
             <div class="section-heading">
                 <div>
@@ -160,7 +267,11 @@
                                 <td>#{{ event.id }}</td>
                                 <td>{{ event.scan_type }}</td>
                                 <td class="finding-cell">{{ event.finding }}</td>
-                                <td><span class="risk-pill {{ event.risk_level|lower }}">{{ event.risk_level }}</span></td>
+                                <td>
+                                    <span class="risk-pill {{ event.risk_level|lower }}">
+                                        {{ event.risk_level }}
+                                    </span>
+                                </td>
                                 <td class="time-cell">{{ event.scanned_at }}</td>
                             </tr>
                         {% else %}
@@ -178,6 +289,7 @@
             </div>
         </section>
 
+        <!-- RISK ASSESSMENT -->
         <section id="assessment" class="content-section">
             <div class="section-heading">
                 <div>
@@ -192,11 +304,13 @@
                     <h3>Low Risk</h3>
                     <p>No matching demo patterns were detected. This does not guarantee that input is safe.</p>
                 </div>
+
                 <div class="risk-info medium">
                     <span class="risk-symbol">!</span>
                     <h3>Medium Risk</h3>
                     <p>A suspicious pattern was detected and should be reviewed.</p>
                 </div>
+
                 <div class="risk-info high">
                     <span class="risk-symbol">⚠</span>
                     <h3>High Risk</h3>
@@ -210,7 +324,9 @@
             <p>CodeAlpha Internship Project · Educational Security Monitoring Demo</p>
             <p class="footer-note">Pattern matching is limited and is not a substitute for a professional security audit.</p>
         </footer>
+
     </main>
 </div>
 </body>
 </html>
+
