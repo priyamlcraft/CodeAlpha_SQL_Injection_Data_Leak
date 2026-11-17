@@ -1,0 +1,180 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL SHIELD | Secure Vault</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .vault-container {
+            max-width: 1000px;
+            margin: 35px auto;
+        }
+
+        .vault-card {
+            background: #111b30;
+            border: 1px solid #263750;
+            border-radius: 14px;
+            padding: 28px;
+            margin-bottom: 25px;
+        }
+
+        .vault-card h2 {
+            color: #55d9ed;
+            margin-bottom: 12px;
+        }
+
+        .vault-card p {
+            color: #aab8ce;
+            line-height: 1.6;
+        }
+
+        .vault-card textarea {
+            width: 100%;
+            min-height: 120px;
+            margin: 18px 0;
+            padding: 14px;
+            color: #fff;
+            background: #080e1b;
+            border: 1px solid #34445f;
+            border-radius: 8px;
+            resize: vertical;
+        }
+
+        .vault-button {
+            padding: 12px 22px;
+            background: #55d9ed;
+            color: #080e1b;
+            border: none;
+            border-radius: 7px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .vault-record {
+            background: #0b1527;
+            border: 1px solid #263750;
+            border-radius: 9px;
+            padding: 18px;
+            margin-top: 15px;
+            overflow-wrap: anywhere;
+        }
+
+        .vault-record small {
+            color: #8fa3bd;
+        }
+
+        .vault-record p {
+            color: #fff;
+            margin-top: 12px;
+            white-space: pre-wrap;
+        }
+
+        .vault-message {
+            padding: 12px;
+            border-radius: 7px;
+            margin: 15px 0;
+        }
+
+        .vault-success {
+            background: #123d32;
+            color: #8df0c4;
+        }
+
+        .vault-error {
+            background: #48232b;
+            color: #ff9aaa;
+        }
+
+        .vault-back {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #55d9ed;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="main-content">
+        <div class="vault-container">
+
+            <a class="vault-back" href="{{ url_for('dashboard') }}">
+                ← Back to Dashboard
+            </a>
+
+            <section class="vault-card">
+                <h2>🔐 Secure Data Vault</h2>
+
+                <p>
+                    Store fictional demo information securely using
+                    AES-256-GCM encryption. Data is encrypted before
+                    being saved to the database.
+                </p>
+
+                {% if success %}
+                    <div class="vault-message vault-success">
+                        {{ success }}
+                    </div>
+                {% endif %}
+
+                {% if error %}
+                    <div class="vault-message vault-error">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('secure_vault') }}">
+                    <input
+                        type="hidden"
+                        name="csrf_token"
+                        value="{{ csrf_token() }}"
+                    >
+
+                    <label for="record_text">
+                        Demo Information
+                    </label>
+
+                    <textarea
+                        id="record_text"
+                        name="record_text"
+                        maxlength="2000"
+                        placeholder="Enter fictional demo information..."
+                        required
+                    ></textarea>
+
+                    <button class="vault-button" type="submit">
+                        Encrypt & Save
+                    </button>
+                </form>
+            </section>
+
+            <section class="vault-card">
+                <h2>Stored Secure Records</h2>
+
+                <p>
+                    Only records belonging to your logged-in account
+                    are displayed here.
+                </p>
+
+                {% if records %}
+                    {% for record in records %}
+                        <div class="vault-record">
+                            <small>
+                                Record #{{ record.id }} |
+                                {{ record.created_at }}
+                            </small>
+
+                            <p>{{ record.data }}</p>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No encrypted records saved yet.</p>
+                {% endif %}
+            </section>
+
+        </div>
+    </main>
+</body>
+</html>

@@ -1,41 +1,69 @@
-# SQL SHIELD – SQL Injection & Data Leak Detection System
+﻿# SQL SHIELD
+## SQL Injection & Data Leak Detection System
 
-## Internship Information
+SQL SHIELD is a lightweight Flask-based web application developed for the CodeAlpha Cloud Computing Internship – Task 2.
 
-- **Organization:** CodeAlpha
-- **Internship Domain:** Cloud Computing
-- **Project Title:** SQL Injection & Data Leak Detection System
-- **Project Category:** Security Monitoring
+The project demonstrates SQL injection pattern detection, sensitive data leak identification, secure password storage, encrypted data storage, and user authentication.
 
-## Project Overview
+## Project Objectives
 
-SQL SHIELD is a Python-based security monitoring application developed as part of the CodeAlpha Internship.
-
-The application provides a web-based dashboard for identifying selected SQL injection patterns and potential sensitive data exposure in sample input. It also maintains scan records using an SQLite database.
-
-This project demonstrates web application development, backend processing, database integration, and security monitoring concepts relevant to secure cloud-based applications.
+- Identify suspicious SQL injection patterns in submitted text.
+- Detect possible exposure of sensitive information.
+- Protect database operations using parameterized SQL queries.
+- Secure sensitive vault records using AES-256-GCM encryption.
+- Protect user accounts with password hashing and authentication.
+- Maintain security event logs and dashboard analytics.
 
 ## Key Features
 
-- SQL Injection Pattern Detection
-- Sensitive Data Leak Detection
-- Risk Level Classification (Low, Medium, High)
-- Security Event Logging
-- SQLite Database Integration
-- Dashboard with Scan Statistics
-- CSRF Protection
-- Responsive Web Interface
-- Local Security Scan History
+### 1. User Authentication
+- User registration and login.
+- Password hashing using Werkzeug.
+- Session-based authentication using Flask-Login.
+
+### 2. SQL Injection Pattern Scanner
+- Checks submitted text for selected suspicious SQL patterns.
+- Displays detected findings and risk levels.
+- Does not execute submitted SQL statements.
+
+### 3. Data Leak Detection
+- Identifies possible exposure of email addresses.
+- Detects possible Indian mobile numbers.
+- Checks for long numeric identifiers.
+- Identifies possible exposed credentials or secrets.
+
+### 4. AES-256-GCM Secure Data Vault
+- Encrypts sensitive demo records before database storage.
+- Uses AES-256-GCM authenticated encryption.
+- Uses a randomly generated nonce for encryption.
+- Decrypts records for their authorized owner.
+
+### 5. Additional Security Controls
+- Parameterized SQL queries.
+- CSRF protection using Flask-WTF.
+- User-specific access to stored vault records.
+- HTTP-only session cookies.
+- Environment-based secret configuration.
+
+### 6. Security Dashboard
+- Total scan statistics.
+- Threat and safe scan counts.
+- Risk-level analytics.
+- Security event logs.
 
 ## Technologies Used
 
-- **Programming Language:** Python
-- **Backend Framework:** Flask
-- **Database:** SQLite
-- **Security:** Flask-WTF (CSRF Protection)
-- **Frontend:** HTML5, CSS3
-- **Pattern Detection:** Regular Expressions
-- **Environment Configuration:** python-dotenv
+- Python
+- Flask
+- SQLite
+- Flask-Login
+- Flask-WTF
+- Werkzeug
+- Cryptography
+- HTML
+- CSS
+- JavaScript
+- python-dotenv
 
 ## Project Structure
 
@@ -43,144 +71,154 @@ This project demonstrates web application development, backend processing, datab
 CodeAlpha_SQL_Injection_Data_Leak/
 │
 ├── app.py
+├── crypto_utils.py
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
 │
 ├── templates/
-│   └── index.html
+│   ├── index.html
+│   ├── login.html
+│   ├── register.html
+│   └── secure_vault.html
 │
-└── static/
-    └── style.css
+├── static/
+│   └── style.css
+│
+├── .env
+└── security_logs.db
 ```
+
+The `.env`, virtual environment, and database files are local files and should not be committed to GitHub.
 
 ## Installation and Setup
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/priyamlcraft/CodeAlpha_SQL_Injection_Data_Leak.git
-```
-
-### 2. Navigate to the Project Folder
-
-```bash
 cd CodeAlpha_SQL_Injection_Data_Leak
 ```
 
-### 3. Create a Virtual Environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv .venv
 ```
 
-### 4. Activate the Environment
-
-For Windows PowerShell:
+Activate it on Windows PowerShell:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-### 5. Install Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 6. Run the Application
+### 4. Configure environment variables
+
+Create a `.env` file in the project root.
+
+Add two independently generated values:
+
+```env
+SECRET_KEY=your_generated_flask_secret
+AES_256_KEY=your_generated_base64_aes_key
+```
+
+Generate a Flask secret key:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Generate a 32-byte AES-256 key:
+
+```bash
+python -c "import base64,secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
+```
+
+Copy the generated values into `.env`. Never publish this file or share the secret keys.
+
+### 5. Run the application
 
 ```bash
 python app.py
 ```
 
-Open your browser and visit:
+Open the application locally:
 
-```text
 http://127.0.0.1:5000
-```
 
-## How It Works
+Register an account to access the dashboard.
 
-1. Open the SQL SHIELD dashboard.
-2. Select a scan category:
-   - SQL Injection Pattern Detection
-   - Sensitive Data Leak Detection
-3. Enter sample text for analysis.
-4. Click the Security Scan button.
-5. View the detected pattern and assigned risk level.
-6. Review previous scan activities in the Security Event Logs section.
+## Security Implementation
 
-## Cloud Computing Relevance
+### SQL Injection Protection
 
-This project explores concepts relevant to secure cloud-based application development:
+The application uses parameterized SQL queries for database operations involving user-provided values. This separates SQL commands from data.
 
-- Web-based application architecture
-- Backend processing using Python Flask
-- Database integration and record management
-- Application-level security monitoring
-- Secure handling of user input
-- Understanding application security in cloud environments
+The scanner also checks submitted text against a limited collection of suspicious SQL patterns. It is a demonstration tool, not a complete SQL injection detection engine.
 
-**Deployment Status:** The current version runs locally and has not yet been deployed to a cloud platform.
+### Password Protection
 
-## Security Notes
+User passwords are stored as salted password hashes using Werkzeug rather than as plaintext or reversible encrypted passwords.
 
-- This project is designed for educational and demonstration purposes.
-- It uses basic pattern matching and is not a complete security scanner.
-- User-provided SQL statements are not executed.
-- Raw scan input is not stored in the event log; only scan summaries are recorded.
-- Do not use this application as a replacement for professional security testing.
+### Sensitive Data Encryption
+
+Secure Vault records are encrypted using AES-256-GCM before being stored in SQLite.
+
+The encryption key is loaded from the environment and is not stored in the source code.
+
+### User Access Control
+
+Authentication and user-specific database queries help ensure that users access only their own secure vault records.
+
+## Testing
+
+The following local checks have been performed:
+
+- User registration and login.
+- Login and logout flow.
+- Password hash verification.
+- SQL pattern scanner checks.
+- Data leak pattern detection checks.
+- AES-256-GCM encryption and decryption.
+- Encrypted record storage verification.
+- User-specific vault access verification.
+- Parameterized SQL query review.
+- Normal CSRF-protected form submissions.
+
+These checks do not constitute a complete security audit.
+
+## Current Project Status
+
+The Flask application has been tested locally.
+
+Cloud deployment and public internet accessibility are not yet configured.
+
+The application currently uses SQLite and Flask's development server. It should not be treated as production-ready until deployment hardening, HTTPS, production server configuration, persistent storage, and additional security testing are completed.
 
 ## Future Improvements
 
-- Cloud platform deployment
-- Cloud database integration
-- Enhanced security monitoring
-- Improved reporting and analytics
-- User authentication and role-based access
+- Cloud hosting and HTTPS deployment.
+- Production WSGI server configuration.
+- Managed database integration.
+- Expanded security testing.
+- Improved monitoring and alerting.
+- More comprehensive detection rules.
 
-## Project Information
+## Internship Information
 
-- **Project Name:** SQL SHIELD
-- **Internship Organization:** CodeAlpha
-- **Internship Domain:** Cloud Computing
-- **Project Focus:** SQL Injection Pattern Detection and Data Leak Monitoring
-- **Application Type:** Web-Based Security Monitoring System
+**Internship:** CodeAlpha Cloud Computing Internship
+
+**Task:** Task 2 – Detecting Data Leaks Using SQL Injection
+
+**Project:** SQL SHIELD – SQL Injection & Data Leak Detection System
 
 ---
 
-*Developed as part of the CodeAlpha Internship for educational purposes.*
-
-## Testing Results
-
-The SQL SHIELD application was tested using different sample inputs in a local educational environment.
-
-### Test Summary
-
-| Test Case | Scan Category | Expected Result | Status |
-|---|---|---|---|
-| Normal SQL Query | SQL Injection Pattern Detection | Low Risk | Passed |
-| UNION SELECT Pattern | SQL Injection Pattern Detection | Medium Risk | Passed |
-| Email Address Detection | Sensitive Data Leak Detection | Medium Risk | Passed |
-| SQL Comment Pattern | SQL Injection Pattern Detection | Medium Risk | Passed |
-| Multiple Suspicious Patterns | SQL Injection Pattern Detection | High Risk | Passed |
-
-### Testing Observations
-
-- Identified selected SQL injection-related patterns.
-- Detected potential sensitive information such as email addresses.
-- Classified results into Low, Medium, and High risk levels.
-- Stored scan summaries and timestamps in SQLite.
-- Displayed scan statistics and recent events on the dashboard.
-
-### Testing Environment
-
-- Operating System: Windows
-- Programming Language: Python
-- Framework: Flask
-- Database: SQLite
-- Testing Type: Local Functional Testing
-
-**Note:** These tests validate predefined pattern-matching rules only. They do not guarantee complete SQL injection protection or detection of all sensitive data exposure.
-
+Developed as an educational security project.
