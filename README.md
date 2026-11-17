@@ -151,3 +151,36 @@ This project explores concepts relevant to secure cloud-based application develo
 ---
 
 *Developed as part of the CodeAlpha Internship for educational purposes.*
+
+## Testing Results
+
+The SQL SHIELD application was tested using different sample inputs in a local educational environment.
+
+### Test Summary
+
+| Test Case | Scan Category | Expected Result | Status |
+|---|---|---|---|
+| Normal SQL Query | SQL Injection Pattern Detection | Low Risk | Passed |
+| UNION SELECT Pattern | SQL Injection Pattern Detection | Medium Risk | Passed |
+| Email Address Detection | Sensitive Data Leak Detection | Medium Risk | Passed |
+| SQL Comment Pattern | SQL Injection Pattern Detection | Medium Risk | Passed |
+| Multiple Suspicious Patterns | SQL Injection Pattern Detection | High Risk | Passed |
+
+### Testing Observations
+
+- Identified selected SQL injection-related patterns.
+- Detected potential sensitive information such as email addresses.
+- Classified results into Low, Medium, and High risk levels.
+- Stored scan summaries and timestamps in SQLite.
+- Displayed scan statistics and recent events on the dashboard.
+
+### Testing Environment
+
+- Operating System: Windows
+- Programming Language: Python
+- Framework: Flask
+- Database: SQLite
+- Testing Type: Local Functional Testing
+
+**Note:** These tests validate predefined pattern-matching rules only. They do not guarantee complete SQL injection protection or detection of all sensitive data exposure.
+
