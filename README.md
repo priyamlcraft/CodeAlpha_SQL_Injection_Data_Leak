@@ -59,7 +59,7 @@ CodeAlpha_SQL_Injection_Data_Leak/
 ### 1. Clone the Repository
 
 ```bash
-git clone YOUR_GITHUB_REPOSITORY_URL
+git clone https://github.com/priyamlcraft/CodeAlpha_SQL_Injection_Data_Leak.git
 ```
 
 ### 2. Navigate to the Project Folder
