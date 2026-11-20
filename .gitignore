@@ -3,5 +3,6 @@ __pycache__/
 *.py[cod]
 .env
 security_logs.db
+security_logs_backup.db
 instance/
 .pytest_cache/

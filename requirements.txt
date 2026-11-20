@@ -3,3 +3,4 @@ Flask-WTF
 python-dotenv
 cryptography
 Flask-Login
+psycopg[binary]

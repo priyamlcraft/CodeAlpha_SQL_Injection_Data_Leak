@@ -2,6 +2,8 @@
 import os
 import re
 import sqlite3
+import psycopg
+
 from datetime import datetime, timezone
 
 from flask import (
@@ -37,11 +39,23 @@ from crypto_utils import (
 )
 
 
-# Environment Configuration
-load_dotenv()
+# ============================================================
+# ENVIRONMENT CONFIGURATION
+# ============================================================
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 DATABASE = os.path.join(BASE_DIR, "security_logs.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+USE_POSTGRES = bool(DATABASE_URL)
+
+
+# ============================================================
+# FLASK APPLICATION CONFIGURATION
+# ============================================================
 
 app = Flask(__name__)
 
@@ -54,9 +68,7 @@ if not secret_key or len(secret_key) < 32:
     )
 
 app.config["SECRET_KEY"] = secret_key
-
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
-
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
@@ -67,24 +79,141 @@ app.config["SESSION_COOKIE_SECURE"] = (
 csrf = CSRFProtect(app)
 
 
-# Flask Login Configuration
+# ============================================================
+# FLASK LOGIN CONFIGURATION
+# ============================================================
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
 login_manager.login_message = "Please log in to access SQL SHIELD."
 
 
-# Database Connection
+# ============================================================
+# DATABASE ROW COMPATIBILITY
+# ============================================================
+
+class HybridRow(dict):
+
+    def __init__(self, columns, values):
+        super().__init__(zip(columns, values))
+        self._values = values
+
+    def __getitem__(self, key):
+
+        if isinstance(key, int):
+            return self._values[key]
+
+        return super().__getitem__(key)
+
+
+def hybrid_row_factory(cursor):
+
+    # CREATE, INSERT, UPDATE and other commands may not
+    # return a result set. In that case description is None.
+    if cursor.description is None:
+        return lambda values: values
+
+    columns = [column.name for column in cursor.description]
+
+    def create_row(values):
+        return HybridRow(columns, values)
+
+    return create_row
+
+
+# ============================================================
+# POSTGRESQL CONNECTION WRAPPER
+# ============================================================
+
+class PostgresConnection:
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, query, parameters=()):
+
+        # Convert SQLite-style placeholders to PostgreSQL style.
+        query = query.replace("?", "%s")
+
+        return self.connection.execute(query, parameters)
+
+    def commit(self):
+        self.connection.commit()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+
+        try:
+            return self.connection.__exit__(
+                exc_type,
+                exc_value,
+                traceback
+            )
+        finally:
+            self.connection.close()
+
+
+# ============================================================
+# SQLITE CONNECTION WRAPPER
+# ============================================================
+
+class SQLiteConnection:
+
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, query, parameters=()):
+        return self.connection.execute(query, parameters)
+
+    def commit(self):
+        self.connection.commit()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+
+        try:
+            if exc_type is None:
+                self.connection.commit()
+            else:
+                self.connection.rollback()
+        finally:
+            self.connection.close()
+
+        return False
+
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+
 def get_db():
+
+    if USE_POSTGRES:
+
+        connection = psycopg.connect(
+            DATABASE_URL,
+            row_factory=hybrid_row_factory,
+            connect_timeout=10
+        )
+
+        return PostgresConnection(connection)
 
     connection = sqlite3.connect(DATABASE)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
 
-    return connection
+    return SQLiteConnection(connection)
 
 
-# User Model
+# ============================================================
+# USER MODEL
+# ============================================================
+
 class User(UserMixin):
 
     def __init__(self, user_id, username):
@@ -107,81 +236,118 @@ def load_user(user_id):
         if user:
             return User(user["id"], user["username"])
 
-    except (sqlite3.Error, ValueError):
+    except (sqlite3.Error, psycopg.Error, ValueError):
         return None
 
     return None
 
 
-# Database Initialization
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
+
 def initialize_database():
 
     with get_db() as db:
 
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS scan_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                scan_type TEXT NOT NULL,
-                risk_level TEXT NOT NULL,
-                finding TEXT NOT NULL,
-                scanned_at TEXT NOT NULL
-            )
-        """)
+        if USE_POSTGRES:
 
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                created_at TEXT NOT NULL
-            )
-        """)
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id BIGSERIAL PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
 
-        db.execute("""
-            CREATE TABLE IF NOT EXISTS secure_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                encrypted_data TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-                    ON DELETE CASCADE
-            )
-        """)
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS scan_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    scan_type TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    finding TEXT NOT NULL,
+                    scanned_at TEXT NOT NULL
+                )
+            """)
+
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS secure_records (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    encrypted_data TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                        ON DELETE CASCADE
+                )
+            """)
+
+        else:
+
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS scan_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    scan_type TEXT NOT NULL,
+                    risk_level TEXT NOT NULL,
+                    finding TEXT NOT NULL,
+                    scanned_at TEXT NOT NULL
+                )
+            """)
+
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL UNIQUE,
+                    password_hash TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                )
+            """)
+
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS secure_records (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    encrypted_data TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                        ON DELETE CASCADE
+                )
+            """)
 
         db.commit()
 
 
-# SQL Injection Pattern Analysis
+# ============================================================
+# SQL INJECTION PATTERN ANALYSIS
+# ============================================================
+
 def analyze_sql_patterns(text):
-    """Educational pattern checks only. Never executes submitted SQL."""
+    """
+    Educational pattern checks only.
+    Submitted text is never executed as SQL.
+    """
 
     patterns = [
-
         (
             r"\bUNION\s+SELECT\b",
             "UNION-based SQL pattern"
         ),
-
         (
             r"\bOR\s+['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?",
             "Suspicious OR condition"
         ),
-
         (
             r"(--|/\*|\*/|;--)",
             "SQL comment or statement separator"
         ),
-
         (
             r"\b(DROP|DELETE|ALTER|TRUNCATE)\s+(TABLE|DATABASE)\b",
             "Destructive SQL keyword combination"
         ),
-
         (
             r"\bSLEEP\s*\(",
             "Time-delay SQL function pattern"
         ),
-
     ]
 
     findings = [
@@ -193,33 +359,31 @@ def analyze_sql_patterns(text):
     return findings
 
 
-# Data Leak Analysis
+# ============================================================
+# DATA LEAK ANALYSIS
+# ============================================================
+
 def analyze_data_leaks(text):
 
     findings = []
 
     checks = [
-
         (
             r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",
             "Email address detected"
         ),
-
         (
             r"\b(?:\+91[\s-]?)?[6-9]\d{9}\b",
             "Possible Indian mobile number detected"
         ),
-
         (
-           r"\b(?:\d[ -]?){12,19}\b",
+            r"\b(?:\d[ -]?){12,19}\b",
             "Possible long numeric identifier detected"
         ),
-
         (
             r"\b(?:api[_-]?key|password|secret|access[_-]?token)\s*[:=]\s*\S+",
             "Possible credential or secret exposed"
         ),
-
     ]
 
     for pattern, description in checks:
@@ -230,7 +394,10 @@ def analyze_data_leaks(text):
     return findings
 
 
-# Save Security Event
+# ============================================================
+# SAVE SECURITY EVENT
+# ============================================================
+
 def save_event(scan_type, risk_level, finding):
 
     timestamp = datetime.now(timezone.utc).strftime(
@@ -251,42 +418,45 @@ def save_event(scan_type, risk_level, finding):
         db.commit()
 
 
-# Dashboard Analytics
+# ============================================================
+# DASHBOARD ANALYTICS
+# ============================================================
+
 def get_dashboard_data():
 
     with get_db() as db:
 
         total_scans = db.execute(
-            "SELECT COUNT(*) FROM scan_events"
-        ).fetchone()[0]
+            "SELECT COUNT(*) AS count FROM scan_events"
+        ).fetchone()["count"]
 
         threats = db.execute(
             """
-            SELECT COUNT(*) FROM scan_events
+            SELECT COUNT(*) AS count FROM scan_events
             WHERE risk_level IN ('High', 'Medium')
             """
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         safe_scans = db.execute(
             """
-            SELECT COUNT(*) FROM scan_events
+            SELECT COUNT(*) AS count FROM scan_events
             WHERE risk_level = 'Low'
             """
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         medium_risk = db.execute(
             """
-            SELECT COUNT(*) FROM scan_events
+            SELECT COUNT(*) AS count FROM scan_events
             WHERE risk_level = 'Medium'
             """
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         high_risk = db.execute(
             """
-            SELECT COUNT(*) FROM scan_events
+            SELECT COUNT(*) AS count FROM scan_events
             WHERE risk_level = 'High'
             """
-        ).fetchone()[0]
+        ).fetchone()["count"]
 
         events = db.execute(
             """
@@ -319,7 +489,10 @@ def get_dashboard_data():
     }
 
 
-# Registration
+# ============================================================
+# REGISTRATION
+# ============================================================
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
 
@@ -342,15 +515,12 @@ def register():
             )
 
         elif len(password) < 8:
-
             error = "Password must contain at least 8 characters."
 
         elif len(password) > 128:
-
             error = "Password is too long."
 
         elif password != confirm_password:
-
             error = "Passwords do not match."
 
         else:
@@ -378,14 +548,17 @@ def register():
 
                 return redirect(url_for("login"))
 
-            except sqlite3.IntegrityError:
+            except (sqlite3.IntegrityError, psycopg.IntegrityError):
 
                 error = "This username is already registered."
 
     return render_template("register.html", error=error)
 
 
-# Login
+# ============================================================
+# LOGIN
+# ============================================================
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
 
@@ -425,7 +598,10 @@ def login():
     return render_template("login.html", error=error)
 
 
-# Logout
+# ============================================================
+# LOGOUT
+# ============================================================
+
 @app.route("/logout", methods=["POST"])
 @login_required
 def logout():
@@ -435,7 +611,10 @@ def logout():
     return redirect(url_for("login"))
 
 
-# Secure Vault
+# ============================================================
+# SECURE DATA VAULT
+# ============================================================
+
 @app.route("/secure-vault", methods=["GET", "POST"])
 @login_required
 def secure_vault():
@@ -450,11 +629,9 @@ def secure_vault():
         ).strip()
 
         if not record_text:
-
             error = "Please enter demo text before saving."
 
         elif len(record_text) > 2000:
-
             error = "Demo text must be under 2000 characters."
 
         else:
@@ -537,7 +714,10 @@ def secure_vault():
     )
 
 
-# Main Dashboard
+# ============================================================
+# MAIN DASHBOARD AND SCANNER
+# ============================================================
+
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def dashboard():
@@ -619,7 +799,10 @@ def dashboard():
     )
 
 
-# Error Handlers
+# ============================================================
+# ERROR HANDLERS
+# ============================================================
+
 @app.errorhandler(413)
 def too_large(_error):
 
@@ -635,13 +818,26 @@ def bad_request(_error):
     ), 400
 
 
-# Initialize Database
+# ============================================================
+# INITIALIZE DATABASE
+# ============================================================
+
 initialize_database()
 
+
+# ============================================================
+# APPLICATION STARTUP
+# ============================================================
 
 if __name__ == "__main__":
 
     print("SQL SHIELD is starting...")
+
+    if USE_POSTGRES:
+        print("Database: Neon PostgreSQL")
+    else:
+        print("Database: Local SQLite")
+
     print("Open http://127.0.0.1:5000 in your browser")
 
     app.run(
