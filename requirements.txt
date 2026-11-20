@@ -4,3 +4,4 @@ python-dotenv
 cryptography
 Flask-Login
 psycopg[binary]
+gunicorn
